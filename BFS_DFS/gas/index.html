@@ -3,474 +3,932 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BFS & DFS Graph Visualizer</title>
+  <title>BFS vs DFS 미로 탈출 벤치마커 (Queue vs Stack)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    .node-circle {
-      transition: all 0.3s ease;
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.8)); }
+      50% { transform: scale(1.08); filter: drop-shadow(0 0 10px rgba(245, 158, 11, 1)); }
     }
-    .edge-line {
-      transition: stroke 0.3s ease, stroke-width 0.3s ease;
+    .path-cell {
+      animation: pulseGlow 1.8s infinite ease-in-out;
     }
+    .cell-transition {
+      transition: background-color 0.15s ease, transform 0.15s ease;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
   </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
-  <div class="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
-    <!-- Header -->
-    <header class="border-b border-slate-700 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans selection:bg-blue-600 selection:text-white">
+  <div class="max-w-7xl mx-auto p-3 sm:p-6 space-y-6">
+    <header class="border-b border-slate-800 pb-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
       <div>
-        <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-400 via-indigo-300 to-teal-300 bg-clip-text text-transparent">
-          BFS & DFS Graph Traversal Visualizer
-        </h1>
-        <p class="text-xs sm:text-sm text-slate-400 mt-1">
-          Google Cloud Run 백엔드 연동 너비 우선 탐색(BFS) & 깊이 우선 탐색(DFS) 알고리즘 시각화
+        <div class="flex items-center gap-3">
+          <span class="text-3xl">🧩</span>
+          <h1 class="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-blue-400 via-indigo-300 to-amber-300 bg-clip-text text-transparent">
+            BFS vs DFS 미로 탈출 벤치마커
+          </h1>
+        </div>
+        <p class="text-xs sm:text-sm text-slate-400 mt-1.5 leading-relaxed">
+          자료구조 <strong>큐(Queue, FIFO)</strong>와 <strong>스택(Stack, LIFO)</strong>의 원리 차이가 만들어내는 
+          <strong>최단 경로 보장 vs 깊이 우선 돌진 및 백트래킹</strong>을 실시간으로 비교 시각화합니다.
         </p>
       </div>
-      <div class="flex items-center gap-2">
-        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
-          <span class="w-2 h-2 mr-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          GAS WebApp Active
-        </span>
-      </div>
-    </header>
 
-    <!-- Cloud Run Config Card -->
-    <section class="bg-slate-800/80 rounded-xl p-4 sm:p-5 border border-slate-700 shadow-lg">
-      <h2 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-        <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-        </svg>
-        Cloud Run 백엔드 API 연동 설정
-      </h2>
-      <div class="flex flex-col sm:flex-row gap-3">
-        <div class="flex-1">
+      <div class="flex flex-col sm:flex-row items-end sm:items-center gap-2.5 w-full md:w-auto">
+        <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-lg p-1.5 w-full sm:w-80">
           <input
             id="serverUrl"
             type="url"
-            placeholder="예: https://my-cloudrun-app-xxxxx.run.app"
-            class="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Cloud Run URL (선택사항)"
+            class="bg-transparent text-xs text-slate-200 px-2 py-1 focus:outline-none flex-1 placeholder-slate-500"
           />
+          <button
+            onclick="testBackendConnection()"
+            class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-[11px] font-medium rounded text-slate-300 transition"
+          >
+            연결
+          </button>
         </div>
-        <button
-          id="btnTestConnection"
-          onclick="testConnection()"
-          class="px-4 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs sm:text-sm font-medium transition text-slate-200"
-        >
-          연결 테스트
-        </button>
+        <div id="engineBadge" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-950 text-blue-400 border border-blue-800">
+          <span class="w-2 h-2 mr-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+          브라우저 로컬 엔진 가동
+        </div>
       </div>
-      <p id="connectionStatus" class="text-xs text-slate-400 mt-2"></p>
+    </header>
+
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+      <div class="bg-slate-900/90 rounded-xl p-3.5 sm:p-4 border border-slate-800 flex flex-col justify-between shadow-sm">
+        <div class="flex items-center justify-between text-xs text-slate-400">
+          <span>🏆 최종 탈출 경로 길이</span>
+          <span class="text-amber-400 text-[11px]">최적성 비교</span>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <div class="text-lg sm:text-2xl font-bold text-blue-400" id="kpiBfsPath">-</div>
+          <span class="text-xs text-slate-500">vs</span>
+          <div class="text-lg sm:text-2xl font-bold text-purple-400" id="kpiDfsPath">-</div>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-1" id="kpiPathComment">탐색 실행 대기 중</p>
+      </div>
+
+      <div class="bg-slate-900/90 rounded-xl p-3.5 sm:p-4 border border-slate-800 flex flex-col justify-between shadow-sm">
+        <div class="flex items-center justify-between text-xs text-slate-400">
+          <span>🔍 탐색한 총 셀 수</span>
+          <span class="text-sky-400 text-[11px]">탐색 범위</span>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <div class="text-lg sm:text-2xl font-bold text-blue-400" id="kpiBfsVisited">-</div>
+          <span class="text-xs text-slate-500">vs</span>
+          <div class="text-lg sm:text-2xl font-bold text-purple-400" id="kpiDfsVisited">-</div>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-1" id="kpiVisitedComment">목적지 도달 전 방문 칸 수</p>
+      </div>
+
+      <div class="bg-slate-900/90 rounded-xl p-3.5 sm:p-4 border border-slate-800 flex flex-col justify-between shadow-sm">
+        <div class="flex items-center justify-between text-xs text-slate-400">
+          <span>💾 최대 대기열 크기 (메모리)</span>
+          <span class="text-emerald-400 text-[11px]">큐 vs 스택</span>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <div class="text-lg sm:text-2xl font-bold text-blue-400" id="kpiBfsMem">-</div>
+          <span class="text-xs text-slate-500">vs</span>
+          <div class="text-lg sm:text-2xl font-bold text-purple-400" id="kpiDfsMem">-</div>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-1" id="kpiMemComment">Queue Max vs Stack Max</p>
+      </div>
+
+      <div class="bg-slate-900/90 rounded-xl p-3.5 sm:p-4 border border-slate-800 flex flex-col justify-between shadow-sm">
+        <div class="flex items-center justify-between text-xs text-slate-400">
+          <span>⚖️ 핵심 원리 결론</span>
+          <span class="text-indigo-400 text-[11px]">알고리즘 특성</span>
+        </div>
+        <div class="mt-1 text-xs text-slate-200 font-medium leading-relaxed" id="kpiConclusion">
+          <span class="text-blue-400 font-bold">BFS</span>: 최단 경로 100% 보장<br>
+          <span class="text-purple-400 font-bold">DFS</span>: 우회·백트래킹 발생
+        </div>
+        <p class="text-[10px] text-slate-500 mt-1">상하좌우 4방향 균등 가중치 기준</p>
+      </div>
     </section>
 
-    <!-- Main Workspace -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Left Panel: Controls & Graph Input -->
-      <div class="space-y-4">
-        <!-- Controls -->
-        <div class="bg-slate-800/80 rounded-xl p-4 border border-slate-700 space-y-4">
-          <h3 class="text-sm font-semibold text-slate-300">탐색 알고리즘 설정</h3>
-          <div>
-            <label class="block text-xs text-slate-400 mb-1.5 font-medium">알고리즘 선택</label>
-            <div class="grid grid-cols-2 gap-2">
-              <button
-                id="btnAlgoBFS"
-                onclick="setAlgorithm('BFS')"
-                class="py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white shadow-sm transition"
-              >
-                BFS (너비 우선 / 큐)
-              </button>
-              <button
-                id="btnAlgoDFS"
-                onclick="setAlgorithm('DFS')"
-                class="py-2 text-xs font-semibold rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 transition"
-              >
-                DFS (깊이 우선 / 스택)
-              </button>
-            </div>
-          </div>
+    <div class="bg-slate-900/95 rounded-xl p-4 border border-slate-800 flex flex-wrap items-center justify-between gap-4 shadow-lg">
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          id="btnRun"
+          onclick="runSimulations()"
+          class="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm shadow-md transition flex items-center gap-2"
+        >
+          <span>🚀</span> 동시 미로 탈출 시작
+        </button>
+        <button
+          id="btnPlayPause"
+          onclick="togglePlayPause()"
+          class="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-medium transition"
+        >
+          재생 ▶
+        </button>
+        <button
+          onclick="stepBackward()"
+          class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm transition"
+        >
+          ◀ 이전
+        </button>
+        <button
+          onclick="stepForward()"
+          class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm transition"
+        >
+          다음 ▶
+        </button>
+        <button
+          onclick="resetVisualization()"
+          class="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm transition"
+        >
+          초기화 ↺
+        </button>
+      </div>
 
-          <div>
-            <label class="block text-xs text-slate-400 mb-1 font-medium">시작 노드</label>
-            <input
-              id="startNode"
-              type="text"
-              value="A"
-              class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs text-slate-400 font-medium mr-1">미로 프리셋:</span>
+        <button onclick="loadPreset('default')" class="px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-300">기본 미로</button>
+        <button onclick="loadPreset('spiral')" class="px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-300">나선형 (DFS 함정)</button>
+        <button onclick="loadPreset('branch')" class="px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-300">갈림길 미로</button>
+        <button onclick="loadPreset('open')" class="px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-300">오픈 필드</button>
+        <button onclick="generateRandomMaze()" class="px-2.5 py-1.5 rounded bg-indigo-900/60 hover:bg-indigo-800 text-xs text-indigo-300 border border-indigo-700">🎲 랜덤 생성</button>
+      </div>
 
-          <div>
-            <label class="block text-xs text-slate-400 mb-1 font-medium">간선 데이터 (Edge List JSON)</label>
-            <textarea
-              id="edgeInput"
-              rows="5"
-              class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >[["A","B"], ["A","C"], ["B","D"], ["B","E"], ["C","F"], ["E","F"]]</textarea>
-          </div>
+      <div class="flex items-center gap-2.5">
+        <span class="text-xs text-slate-400 font-medium">속도:</span>
+        <input
+          id="speedSlider"
+          type="range"
+          min="10"
+          max="300"
+          value="80"
+          class="w-24 sm:w-32 accent-blue-500 cursor-pointer"
+        />
+        <span id="speedLabel" class="text-xs text-slate-400 font-mono w-10">보통</span>
+      </div>
+    </div>
 
-          <div class="pt-2 flex flex-col gap-2">
-            <button
-              id="btnRunTraversal"
-              onclick="startTraversal()"
-              class="w-full py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm font-medium transition shadow-md"
-            >
-              🚀 탐색 실행 및 시각화
-            </button>
-            <div class="flex gap-2">
-              <button
-                onclick="resetGraph()"
-                class="flex-1 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs text-slate-300 transition"
-              >
-                초기화
-              </button>
-              <button
-                onclick="loadPresetGraph()"
-                class="flex-1 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs text-slate-300 transition"
-              >
-                예제 그래프 로드
-              </button>
-            </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-slate-900/90 rounded-2xl p-4 sm:p-5 border border-blue-900/40 shadow-xl flex flex-col space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+          <div class="flex items-center gap-2.5">
+            <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+            <h2 class="text-base sm:text-lg font-bold text-blue-300">너비 우선 탐색 (BFS)</h2>
+            <span class="text-[11px] px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800 font-mono">Queue (FIFO)</span>
           </div>
+          <span id="bfsStepBadge" class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">대기 중</span>
+        </div>
+
+        <div class="flex items-center justify-center p-2 bg-slate-950 rounded-xl border border-slate-800 overflow-auto">
+          <div id="gridBfs" class="grid gap-[2px] select-none p-1"></div>
+        </div>
+
+        <div class="bg-slate-950/80 rounded-xl p-3 border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-semibold text-blue-400 flex items-center gap-1.5">
+              <span>큐 (Queue) 상태</span>
+              <span class="text-[10px] text-slate-500 font-normal">FIFO [Front ➜ Rear]</span>
+            </span>
+            <span id="bfsQueueLength" class="text-xs font-mono text-slate-400">대기 원소: 0개</span>
+          </div>
+          <div id="bfsQueueContainer" class="flex items-center gap-1.5 overflow-x-auto min-h-[38px] p-1.5 bg-slate-900/90 rounded-lg text-xs font-mono text-blue-300">
+            <span class="text-slate-600 text-[11px]">(큐가 비어 있습니다)</span>
+          </div>
+          <p id="bfsActionLog" class="text-[11px] text-slate-400 truncate">탐색 시작 전입니다.</p>
         </div>
       </div>
 
-      <!-- Right Panel: Visualization Canvas & Step Details -->
-      <div class="lg:col-span-2 space-y-4">
-        <!-- Canvas -->
-        <div class="bg-slate-800/80 rounded-xl p-4 border border-slate-700 flex flex-col">
-          <div class="flex justify-between items-center mb-3">
-            <h3 class="text-sm font-semibold text-slate-300 flex items-center gap-2">
-              <span>그래프 탐색 시각화 캔버스</span>
-              <span id="stepBadge" class="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-300">대기 중</span>
-            </h3>
-            <div class="flex items-center gap-1.5">
-              <button onclick="prevStep()" class="px-2.5 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600">◀ 이전</button>
-              <button onclick="togglePlay()" id="btnPlay" class="px-3 py-1 text-xs rounded bg-blue-600 hover:bg-blue-500 font-medium">재생 ▶</button>
-              <button onclick="nextStep()" class="px-2.5 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600">다음 ▶</button>
-            </div>
+      <div class="bg-slate-900/90 rounded-2xl p-4 sm:p-5 border border-purple-900/40 shadow-xl flex flex-col space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+          <div class="flex items-center gap-2.5">
+            <span class="w-3 h-3 rounded-full bg-purple-500"></span>
+            <h2 class="text-base sm:text-lg font-bold text-purple-300">깊이 우선 탐색 (DFS)</h2>
+            <span class="text-[11px] px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800 font-mono">Stack (LIFO)</span>
           </div>
-
-          <!-- SVG Visualizer Canvas -->
-          <div class="w-full h-80 sm:h-96 bg-slate-950 rounded-lg border border-slate-800 relative overflow-hidden flex items-center justify-center">
-            <svg id="graphSvg" class="w-full h-full">
-              <!-- Dynamically populated edges & nodes -->
-            </svg>
-          </div>
+          <span id="dfsStepBadge" class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">대기 중</span>
         </div>
 
-        <!-- Traversal State Inspector (Queue / Stack, Visited) -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div class="bg-slate-800/80 rounded-xl p-4 border border-slate-700">
-            <h4 class="text-xs font-semibold text-slate-400 mb-2 flex items-center justify-between">
-              <span id="dataStructureTitle">큐 (Queue) 상태 [FIFO]</span>
-              <span class="text-[10px] text-slate-500">너비 우선</span>
-            </h4>
-            <div id="dataStructureBox" class="min-h-[50px] p-2 bg-slate-900 rounded border border-slate-800 flex items-center gap-2 overflow-x-auto text-xs font-mono text-blue-400">
-              <span class="text-slate-600">(비어 있음)</span>
-            </div>
-          </div>
+        <div class="flex items-center justify-center p-2 bg-slate-950 rounded-xl border border-slate-800 overflow-auto">
+          <div id="gridDfs" class="grid gap-[2px] select-none p-1"></div>
+        </div>
 
-          <div class="bg-slate-800/80 rounded-xl p-4 border border-slate-700">
-            <h4 class="text-xs font-semibold text-slate-400 mb-2">방문 순서 (Visited Order)</h4>
-            <div id="visitedBox" class="min-h-[50px] p-2 bg-slate-900 rounded border border-slate-800 flex items-center gap-2 overflow-x-auto text-xs font-mono text-emerald-400">
-              <span class="text-slate-600">(방문 없음)</span>
-            </div>
+        <div class="bg-slate-950/80 rounded-xl p-3 border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-semibold text-purple-400 flex items-center gap-1.5">
+              <span>스택 (Stack) 상태</span>
+              <span class="text-[10px] text-slate-500 font-normal">LIFO [Top ➜ Bottom]</span>
+            </span>
+            <span id="dfsStackLength" class="text-xs font-mono text-slate-400">대기 원소: 0개</span>
           </div>
+          <div id="dfsStackContainer" class="flex items-center gap-1.5 overflow-x-auto min-h-[38px] p-1.5 bg-slate-900/90 rounded-lg text-xs font-mono text-purple-300">
+            <span class="text-slate-600 text-[11px]">(스택이 비어 있습니다)</span>
+          </div>
+          <p id="dfsActionLog" class="text-[11px] text-slate-400 truncate">탐색 시작 전입니다.</p>
         </div>
       </div>
     </div>
+
+    <section class="bg-slate-900/80 rounded-2xl p-5 border border-slate-800 space-y-4">
+      <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+          <span>🎨 캔버스 범례(Legend) 및 마우스 조작법</span>
+        </h3>
+        <p class="text-xs text-slate-400">
+          💡 <strong>미로 직접 편집</strong>: 그리드 셀을 클릭하거나 드래그하여 벽(#)을 추가/제거할 수 있습니다.
+        </p>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3 text-xs">
+        <div class="flex items-center gap-1.5">
+          <span class="w-4 h-4 rounded bg-emerald-500 font-bold text-[10px] flex items-center justify-center text-slate-950">S</span>
+          <span class="text-slate-300">시작점 (Start)</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-4 h-4 rounded bg-rose-500 font-bold text-[10px] flex items-center justify-center text-white">G</span>
+          <span class="text-slate-300">도착점 (Goal)</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-4 h-4 rounded bg-slate-800 border border-slate-700"></span>
+          <span class="text-slate-300">벽 (Wall)</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-4 h-4 rounded bg-amber-400"></span>
+          <span class="text-slate-300">현재 탐색 헤드 (Current)</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-4 h-4 rounded bg-sky-600/70"></span>
+          <span class="text-slate-300">BFS 방문 완료 셀</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-4 h-4 rounded bg-purple-600/70"></span>
+          <span class="text-slate-300">DFS 방문 완료 셀</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-4 h-4 rounded bg-amber-400 ring-2 ring-amber-300"></span>
+          <span class="text-amber-300 font-semibold">최종 탈출 경로 (Path)</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 text-xs text-slate-400 leading-relaxed">
+        <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800/80">
+          <h4 class="font-bold text-blue-400 mb-1 flex items-center gap-1.5">
+            <span>🌊 BFS (Breadth-First Search) 작동 원리</span>
+          </h4>
+          <p>
+            시작점에서 거리(간선 수)가 1인 모든 지점을 먼저 방문한 후, 거리가 2인 지점, 3인 지점을 순차적으로 
+            <strong>물결이 동심원으로 퍼지듯</strong> 탐색합니다. 
+            가장 먼저 목적지에 도달하는 순간이 <strong>무조건 최단 경로(Shortest Path)</strong>임이 수학적으로 증명됩니다. 
+            단, 넓은 범위를 큐에 담아두어야 하므로 <strong>메모리 사용량이 큼</strong>에 주의해야 합니다.
+          </p>
+        </div>
+
+        <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800/80">
+          <h4 class="font-bold text-purple-400 mb-1 flex items-center gap-1.5">
+            <span>⚡ DFS (Depth-First Search) 작동 원리</span>
+          </h4>
+          <p>
+            갈 수 있는 한 경로를 선택해 <strong>막다른 길(Dead-end)이 나올 때까지 깊이 직진</strong>합니다. 
+            더 이상 전진할 수 없으면 스택에서 이전 분기점으로 되돌아오는 <strong>백트래킹(Backtracking)</strong>을 수행합니다. 
+            목적지에 빨리 우연히 닿을 수는 있으나 <strong>최단 경로를 보장하지 않으며</strong> 크게 우회할 수 있습니다. 
+            대신 한 줄기 경로만 스택에 저장하므로 <strong>메모리 효율이 우수</strong>합니다.
+          </p>
+        </div>
+      </div>
+    </section>
   </div>
 
   <script>
-    let currentAlgorithm = 'BFS';
-    let simulationSteps = [];
-    let currentStepIndex = 0;
-    let timer = null;
+    const ROWS = 13;
+    const COLS = 17;
+    let gridData = [];
+    let startPos = [1, 1];
+    let goalPos = [11, 15];
 
-    const sampleGraph = {
-      nodes: ['A', 'B', 'C', 'D', 'E', 'F'],
-      positions: {
-        'A': { x: 180, y: 50 },
-        'B': { x: 90,  y: 150 },
-        'C': { x: 270, y: 150 },
-        'D': { x: 50,  y: 270 },
-        'E': { x: 150, y: 270 },
-        'F': { x: 270, y: 270 }
-      },
-      edges: [
-        ['A', 'B'], ['A', 'C'],
-        ['B', 'D'], ['B', 'E'],
-        ['C', 'F'], ['E', 'F']
-      ]
+    let isDrawing = false;
+    let drawMode = 1;
+
+    let bfsResult = null;
+    let dfsResult = null;
+    let currentStep = 0;
+    let maxSteps = 0;
+    let playTimer = null;
+    let stepDelay = 80;
+
+    const PRESETS = {
+      default: [
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1],
+        [1,0,1,1,1,0,1,0,1,1,1,1,1,1,1,0,1],
+        [1,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,1],
+        [1,0,1,0,1,1,1,1,1,1,1,1,0,0,1,0,1],
+        [1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,1],
+        [1,1,1,0,1,0,1,1,1,0,0,1,1,1,1,0,1],
+        [1,0,0,0,1,0,1,0,1,0,0,0,0,0,1,0,1],
+        [1,0,1,1,1,0,1,0,1,1,1,1,0,0,1,0,1],
+        [1,0,0,0,0,0,1,0,0,0,0,1,0,0,1,0,1],
+        [1,0,1,1,1,1,1,1,1,0,0,1,1,0,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+      ],
+      spiral: [
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+      ],
+      branch: [
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1],
+        [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1],
+        [1,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,1],
+        [1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,1,1,1,1,1,0,1,1,1,1,1,1,1,0,1],
+        [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1],
+        [1,1,1,0,1,0,1,1,1,0,1,0,1,0,1,1,1],
+        [1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1],
+        [1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+      ],
+      open: Array.from({ length: 13 }, (_, r) => 
+        Array.from({ length: 17 }, (_, c) => 
+          (r === 0 || r === 12 || c === 0 || c === 16) ? 1 : 0
+        )
+      )
     };
 
-    function setAlgorithm(algo) {
-      currentAlgorithm = algo;
-      const btnBFS = document.getElementById('btnAlgoBFS');
-      const btnDFS = document.getElementById('btnAlgoDFS');
-      const dsTitle = document.getElementById('dataStructureTitle');
-
-      if (algo === 'BFS') {
-        btnBFS.className = 'py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white shadow-sm transition';
-        btnDFS.className = 'py-2 text-xs font-semibold rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 transition';
-        dsTitle.innerText = '큐 (Queue) 상태 [FIFO]';
-      } else {
-        btnDFS.className = 'py-2 text-xs font-semibold rounded-lg bg-indigo-600 text-white shadow-sm transition';
-        btnBFS.className = 'py-2 text-xs font-semibold rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 transition';
-        dsTitle.innerText = '스택 (Stack) 상태 [LIFO]';
-      }
-      resetGraph();
+    function initGrid() {
+      loadPreset('default');
+      setupMouseListeners();
+      setupSpeedSlider();
     }
 
-    function renderGraph(activeNode = null, visitedNodes = new Set()) {
-      const svg = document.getElementById('graphSvg');
-      svg.innerHTML = '';
+    function loadPreset(name) {
+      pauseTimer();
+      const template = PRESETS[name] || PRESETS.default;
+      gridData = JSON.parse(JSON.stringify(template));
+      startPos = [1, 1];
+      goalPos = [ROWS - 2, COLS - 2];
+      renderGrids();
+      resetKPIs();
+    }
 
-      // Draw edges
-      sampleGraph.edges.forEach(([u, v]) => {
-        const p1 = sampleGraph.positions[u];
-        const p2 = sampleGraph.positions[v];
-        if (!p1 || !p2) return;
+    function generateRandomMaze() {
+      pauseTimer();
+      gridData = Array.from({ length: ROWS }, (_, r) =>
+        Array.from({ length: COLS }, (_, c) => {
+          if (r === 0 || r === ROWS - 1 || c === 0 || c === COLS - 1) return 1;
+          return Math.random() < 0.28 ? 1 : 0;
+        })
+      );
+      gridData[startPos[0]][startPos[1]] = 0;
+      gridData[goalPos[0]][goalPos[1]] = 0;
+      renderGrids();
+      resetKPIs();
+    }
 
-        const isTraversed = visitedNodes.has(u) && visitedNodes.has(v);
-        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.setAttribute('x1', p1.x);
-        line.setAttribute('y1', p1.y);
-        line.setAttribute('x2', p2.x);
-        line.setAttribute('y2', p2.y);
-        line.setAttribute('stroke', isTraversed ? '#38bdf8' : '#334155');
-        line.setAttribute('stroke-width', isTraversed ? '3' : '2');
-        line.setAttribute('class', 'edge-line');
-        svg.appendChild(line);
+    function renderGrids() {
+      buildGridDOM('gridBfs');
+      buildGridDOM('gridDfs');
+    }
+
+    function buildGridDOM(containerId) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      container.style.gridTemplateColumns = `repeat(${COLS}, minmax(18px, 24px))`;
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const cell = document.createElement('div');
+          cell.id = `${containerId}_cell_${r}_${c}`;
+          cell.dataset.r = r;
+          cell.dataset.c = c;
+          cell.className = 'w-5 h-5 sm:w-6 sm:h-6 rounded-sm cell-transition flex items-center justify-center text-[10px] font-bold cursor-pointer';
+
+          applyCellBaseStyle(cell, r, c);
+
+          cell.addEventListener('mousedown', (e) => onCellMouseDown(e, r, c));
+          cell.addEventListener('mouseenter', (e) => onCellMouseEnter(e, r, c));
+
+          container.appendChild(cell);
+        }
+      }
+    }
+
+    function applyCellBaseStyle(cell, r, c) {
+      if (r === startPos[0] && c === startPos[1]) {
+        cell.className = 'w-5 h-5 sm:w-6 sm:h-6 rounded-sm bg-emerald-500 text-slate-950 font-black shadow-md flex items-center justify-center';
+        cell.innerText = 'S';
+      } else if (r === goalPos[0] && c === goalPos[1]) {
+        cell.className = 'w-5 h-5 sm:w-6 sm:h-6 rounded-sm bg-rose-500 text-white font-black shadow-md flex items-center justify-center';
+        cell.innerText = 'G';
+      } else if (gridData[r][c] === 1) {
+        cell.className = 'w-5 h-5 sm:w-6 sm:h-6 rounded-sm bg-slate-800 border border-slate-700/80 shadow-inner';
+        cell.innerText = '';
+      } else {
+        cell.className = 'w-5 h-5 sm:w-6 sm:h-6 rounded-sm bg-slate-900/60 border border-slate-800/40 hover:bg-slate-800/50';
+        cell.innerText = '';
+      }
+    }
+
+    function setupMouseListeners() {
+      window.addEventListener('mouseup', () => { isDrawing = false; });
+    }
+
+    function onCellMouseDown(e, r, c) {
+      if ((r === startPos[0] && c === startPos[1]) || (r === goalPos[0] && c === goalPos[1])) return;
+      isDrawing = true;
+      drawMode = gridData[r][c] === 1 ? 0 : 1;
+      toggleCellWall(r, c, drawMode);
+    }
+
+    function onCellMouseEnter(e, r, c) {
+      if (!isDrawing) return;
+      if ((r === startPos[0] && c === startPos[1]) || (r === goalPos[0] && c === goalPos[1])) return;
+      toggleCellWall(r, c, drawMode);
+    }
+
+    function toggleCellWall(r, c, mode) {
+      if (r === 0 || r === ROWS - 1 || c === 0 || c === COLS - 1) return;
+      gridData[r][c] = mode;
+      
+      const c1 = document.getElementById(`gridBfs_cell_${r}_${c}`);
+      const c2 = document.getElementById(`gridDfs_cell_${r}_${c}`);
+      if (c1) applyCellBaseStyle(c1, r, c);
+      if (c2) applyCellBaseStyle(c2, r, c);
+      resetVisualization();
+    }
+
+    const DIRECTIONS = [[-1, 0], [0, 1], [1, 0], [0, -1]];
+
+    function solveBfsLocal() {
+      const queue = [[startPos[0], startPos[1]]];
+      const visitedSet = new Set([`${startPos[0]},${startPos[1]}`]);
+      const parent = {};
+      parent[`${startPos[0]},${startPos[1]}`] = null;
+
+      const steps = [];
+      const visitedOrder = [];
+      let peakQueue = 1;
+      let found = false;
+
+      steps.push({
+        current: [...startPos],
+        queue: [[...startPos]],
+        visited: [[...startPos]],
+        action: `시작 노드 (${startPos[0]}, ${startPos[1]}) 큐에 삽입`
       });
 
-      // Draw nodes
-      sampleGraph.nodes.forEach(nodeId => {
-        const pos = sampleGraph.positions[nodeId];
-        if (!pos) return;
+      while (queue.length > 0) {
+        peakQueue = Math.max(peakQueue, queue.length);
+        const [r, c] = queue.shift();
+        visitedOrder.push([r, c]);
 
-        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        circle.setAttribute('cx', pos.x);
-        circle.setAttribute('cy', pos.y);
-        circle.setAttribute('r', '20');
+        steps.push({
+          current: [r, c],
+          queue: queue.map(p => [...p]),
+          visited: visitedOrder.map(p => [...p]),
+          action: `큐에서 Dequeue ➜ (${r}, ${c}) 방문 처리`
+        });
 
-        let fill = '#1e293b';
-        let stroke = '#64748b';
-        if (nodeId === activeNode) {
-          fill = '#f59e0b';
-          stroke = '#fbbf24';
-        } else if (visitedNodes.has(nodeId)) {
-          fill = '#10b981';
-          stroke = '#34d399';
+        if (r === goalPos[0] && c === goalPos[1]) {
+          found = true;
+          steps.push({
+            current: [r, c],
+            queue: queue.map(p => [...p]),
+            visited: visitedOrder.map(p => [...p]),
+            action: `🎉 목적지 (${r}, ${c}) 도달! 최단 경로 보장 완료`
+          });
+          break;
         }
 
-        circle.setAttribute('fill', fill);
-        circle.setAttribute('stroke', stroke);
-        circle.setAttribute('stroke-width', '2.5');
-        circle.setAttribute('class', 'node-circle shadow-lg');
+        for (const [dr, dc] of DIRECTIONS) {
+          const nr = r + dr;
+          const nc = c + dc;
+          const key = `${nr},${nc}`;
+          if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+            if (gridData[nr][nc] === 0 && !visitedSet.has(key)) {
+              visitedSet.add(key);
+              parent[key] = [r, c];
+              queue.push([nr, nc]);
+              steps.push({
+                current: [r, c],
+                queue: queue.map(p => [...p]),
+                visited: visitedOrder.map(p => [...p]),
+                action: `인접 통로 (${nr}, ${nc}) 발견 ➜ 큐에 Enqueue`
+              });
+            }
+          }
+        }
+      }
 
-        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x', pos.x);
-        text.setAttribute('y', pos.y + 5);
-        text.setAttribute('text-anchor', 'middle');
-        text.setAttribute('fill', '#f8fafc');
-        text.setAttribute('font-size', '12px');
-        text.setAttribute('font-weight', 'bold');
-        text.textContent = nodeId;
+      const path = [];
+      if (found) {
+        let curr = [goalPos[0], goalPos[1]];
+        while (curr) {
+          path.push(curr);
+          curr = parent[`${curr[0]},${curr[1]}`];
+        }
+        path.reverse();
+      }
 
-        g.appendChild(circle);
-        g.appendChild(text);
-        svg.appendChild(g);
-      });
+      return {
+        algorithm: 'BFS',
+        found,
+        path,
+        path_length: path.length,
+        visited_cells_count: visitedOrder.length,
+        peak_memory_size: peakQueue,
+        steps
+      };
     }
 
-    function startTraversal() {
+    function solveDfsLocal() {
+      const stack = [[startPos[0], startPos[1]]];
+      const visitedSet = new Set();
+      const parent = {};
+      parent[`${startPos[0]},${startPos[1]}`] = null;
+
+      const steps = [];
+      const visitedOrder = [];
+      let peakStack = 1;
+      let found = false;
+
+      steps.push({
+        current: [...startPos],
+        queue: [[...startPos]],
+        visited: [],
+        action: `시작 노드 (${startPos[0]}, ${startPos[1]}) 스택에 푸시`
+      });
+
+      while (stack.length > 0) {
+        peakStack = Math.max(peakStack, stack.length);
+        const [r, c] = stack.pop();
+        const key = `${r},${c}`;
+
+        if (visitedSet.has(key)) continue;
+        visitedSet.add(key);
+        visitedOrder.push([r, c]);
+
+        steps.push({
+          current: [r, c],
+          queue: stack.map(p => [...p]),
+          visited: visitedOrder.map(p => [...p]),
+          action: `스택에서 Pop ➜ (${r}, ${c}) 깊이 우선 방문`
+        });
+
+        if (r === goalPos[0] && c === goalPos[1]) {
+          found = true;
+          steps.push({
+            current: [r, c],
+            queue: stack.map(p => [...p]),
+            visited: visitedOrder.map(p => [...p]),
+            action: `🎉 목적지 (${r}, ${c}) 도달!`
+          });
+          break;
+        }
+
+        const validNeighbors = [];
+        for (const [dr, dc] of DIRECTIONS) {
+          const nr = r + dr;
+          const nc = c + dc;
+          const nKey = `${nr},${nc}`;
+          if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+            if (gridData[nr][nc] === 0 && !visitedSet.has(nKey)) {
+              validNeighbors.push([nr, nc]);
+            }
+          }
+        }
+
+        if (validNeighbors.length === 0 && stack.length > 0) {
+          steps.push({
+            current: [r, c],
+            queue: stack.map(p => [...p]),
+            visited: visitedOrder.map(p => [...p]),
+            action: `막다른 길 (${r}, ${c}) ➜ 이전 갈림길로 백트래킹(Backtracking)`
+          });
+        }
+
+        for (let i = validNeighbors.length - 1; i >= 0; i--) {
+          const [nr, nc] = validNeighbors[i];
+          parent[`${nr},${nc}`] = [r, c];
+          stack.push([nr, nc]);
+          steps.push({
+            current: [r, c],
+            queue: stack.map(p => [...p]),
+            visited: visitedOrder.map(p => [...p]),
+            action: `후보 (${nr}, ${nc}) 스택에 푸시`
+          });
+        }
+      }
+
+      const path = [];
+      if (found) {
+        let curr = [goalPos[0], goalPos[1]];
+        while (curr) {
+          path.push(curr);
+          curr = parent[`${curr[0]},${curr[1]}`];
+        }
+        path.reverse();
+      }
+
+      return {
+        algorithm: 'DFS',
+        found,
+        path,
+        path_length: path.length,
+        visited_cells_count: visitedOrder.length,
+        peak_memory_size: peakStack,
+        steps
+      };
+    }
+
+    function runSimulations() {
+      resetVisualization();
       const serverUrl = document.getElementById('serverUrl').value.trim();
-      const startNode = document.getElementById('startNode').value.trim() || 'A';
 
       if (serverUrl && typeof google !== 'undefined' && google.script) {
-        document.getElementById('connectionStatus').innerText = 'Cloud Run API 요청 중...';
+        document.getElementById('engineBadge').innerHTML = '<span class="w-2 h-2 mr-1.5 rounded-full bg-amber-400 animate-ping"></span>Cloud Run 연동 중...';
         google.script.run
           .withSuccessHandler(function(res) {
-            if (res.success) {
-              simulationSteps = res.data.steps;
-              currentStepIndex = 0;
-              document.getElementById('connectionStatus').innerText = 'Cloud Run 탐색 데이터 수신 완료!';
-              applyStep(0);
+            if (res.success && res.data) {
+              bfsResult = res.data.bfs;
+              dfsResult = res.data.dfs;
+              document.getElementById('engineBadge').innerHTML = '<span class="w-2 h-2 mr-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Cloud Run 엔진 활성';
+              startPlayback();
             } else {
-              alert('백엔드 오류: ' + res.error + '\n로컬 시뮬레이션 모드로 전환합니다.');
-              runLocalSimulation(startNode);
+              console.warn('백엔드 오류, 로컬 엔진으로 폴백:', res.error);
+              runLocalEngine();
             }
           })
           .withFailureHandler(function(err) {
-            alert('GAS 통신 오류: ' + err + '\n로컬 시뮬레이션으로 실행합니다.');
-            runLocalSimulation(startNode);
+            console.warn('통신 오류, 로컬 엔진으로 폴백:', err);
+            runLocalEngine();
           })
-          .fetchTraversalData(serverUrl, {
-            algorithm: currentAlgorithm,
-            start_node: startNode,
-            edges: sampleGraph.edges
+          .fetchMazeComparison(serverUrl, {
+            grid: gridData,
+            start: startPos,
+            goal: goalPos,
+            algorithm: 'BOTH'
           });
       } else {
-        runLocalSimulation(startNode);
+        runLocalEngine();
       }
     }
 
-    function runLocalSimulation(start) {
-      simulationSteps = [];
-      const adj = {};
-      sampleGraph.nodes.forEach(n => adj[n] = []);
-      sampleGraph.edges.forEach(([u, v]) => {
-        adj[u].push(v);
-        adj[v].push(u);
-      });
-      sampleGraph.nodes.forEach(n => adj[n].sort());
+    function runLocalEngine() {
+      document.getElementById('engineBadge').innerHTML = '<span class="w-2 h-2 mr-1.5 rounded-full bg-blue-400 animate-pulse"></span>브라우저 로컬 엔진 가동';
+      bfsResult = solveBfsLocal();
+      dfsResult = solveDfsLocal();
+      startPlayback();
+    }
 
-      const visited = [];
-      const visitedSet = new Set();
-
-      if (currentAlgorithm === 'BFS') {
-        const queue = [start];
-        visitedSet.add(start);
-        simulationSteps.push({ current: start, queue: [...queue], visited: [...visitedSet] });
-
-        while (queue.length > 0) {
-          const u = queue.shift();
-          visited.push(u);
-          simulationSteps.push({ current: u, queue: [...queue], visited: [...visited] });
-
-          for (const v of adj[u]) {
-            if (!visitedSet.has(v)) {
-              visitedSet.add(v);
-              queue.push(v);
-              simulationSteps.push({ current: u, queue: [...queue], visited: [...visited] });
-            }
-          }
-        }
-      } else {
-        const stack = [start];
-        const visitedDfs = new Set();
-
-        while (stack.length > 0) {
-          const u = stack.pop();
-          if (!visitedDfs.has(u)) {
-            visitedDfs.add(u);
-            visited.push(u);
-            simulationSteps.push({ current: u, queue: [...stack], visited: [...visited] });
-
-            for (let i = adj[u].length - 1; i >= 0; i--) {
-              const v = adj[u][i];
-              if (!visitedDfs.has(v)) {
-                stack.push(v);
-                simulationSteps.push({ current: u, queue: [...stack], visited: [...visited] });
-              }
-            }
-          }
-        }
-      }
-
-      currentStepIndex = 0;
+    function startPlayback() {
+      maxSteps = Math.max(bfsResult.steps.length, dfsResult.steps.length);
+      currentStep = 0;
+      updateKPIsFinal();
       applyStep(0);
+      playTimer = setInterval(tick, stepDelay);
+      document.getElementById('btnPlayPause').innerText = '일시정지 ❚❚';
     }
 
-    function applyStep(idx) {
-      if (!simulationSteps || simulationSteps.length === 0) return;
-      if (idx < 0) idx = 0;
-      if (idx >= simulationSteps.length) idx = simulationSteps.length - 1;
-      currentStepIndex = idx;
-
-      const step = simulationSteps[idx];
-      document.getElementById('stepBadge').innerText = `스텝 ${idx + 1} / ${simulationSteps.length}`;
-      renderGraph(step.current, new Set(step.visited));
-
-      const dsBox = document.getElementById('dataStructureBox');
-      if (step.queue && step.queue.length > 0) {
-        dsBox.innerHTML = step.queue.map(item => `<span class="px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">${item}</span>`).join(' ➜ ');
+    function tick() {
+      if (currentStep < maxSteps - 1) {
+        currentStep++;
+        applyStep(currentStep);
       } else {
-        dsBox.innerHTML = '<span class="text-slate-600">(비어 있음)</span>';
+        pauseTimer();
+        highlightFinalPaths();
       }
+    }
 
-      const vBox = document.getElementById('visitedBox');
-      if (step.visited && step.visited.length > 0) {
-        vBox.innerHTML = step.visited.map(item => `<span class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">${item}</span>`).join(' ➜ ');
+    function togglePlayPause() {
+      if (playTimer) {
+        pauseTimer();
       } else {
-        vBox.innerHTML = '<span class="text-slate-600">(방문 없음)</span>';
+        if (currentStep >= maxSteps - 1) currentStep = 0;
+        playTimer = setInterval(tick, stepDelay);
+        document.getElementById('btnPlayPause').innerText = '일시정지 ❚❚';
       }
     }
 
-    function nextStep() {
-      if (currentStepIndex < simulationSteps.length - 1) {
-        applyStep(currentStepIndex + 1);
+    function pauseTimer() {
+      if (playTimer) {
+        clearInterval(playTimer);
+        playTimer = null;
+        document.getElementById('btnPlayPause').innerText = '재생 ▶';
       }
     }
 
-    function prevStep() {
-      if (currentStepIndex > 0) {
-        applyStep(currentStepIndex - 1);
+    function stepForward() {
+      pauseTimer();
+      if (currentStep < maxSteps - 1) {
+        currentStep++;
+        applyStep(currentStep);
       }
     }
 
-    function togglePlay() {
-      const btn = document.getElementById('btnPlay');
-      if (timer) {
-        clearInterval(timer);
-        timer = null;
-        btn.innerText = '재생 ▶';
-        btn.className = 'px-3 py-1 text-xs rounded bg-blue-600 hover:bg-blue-500 font-medium';
-      } else {
-        btn.innerText = '일시정지 ❚❚';
-        btn.className = 'px-3 py-1 text-xs rounded bg-amber-600 hover:bg-amber-500 font-medium';
-        timer = setInterval(() => {
-          if (currentStepIndex < simulationSteps.length - 1) {
-            nextStep();
+    function stepBackward() {
+      pauseTimer();
+      if (currentStep > 0) {
+        currentStep--;
+        applyStep(currentStep);
+      }
+    }
+
+    function resetVisualization() {
+      pauseTimer();
+      currentStep = 0;
+      maxSteps = 0;
+      renderGrids();
+      resetKPIs();
+      document.getElementById('bfsStepBadge').innerText = '대기 중';
+      document.getElementById('dfsStepBadge').innerText = '대기 중';
+      document.getElementById('bfsQueueContainer').innerHTML = '<span class="text-slate-600 text-[11px]">(큐가 비어 있습니다)</span>';
+      document.getElementById('dfsStackContainer').innerHTML = '<span class="text-slate-600 text-[11px]">(스택이 비어 있습니다)</span>';
+      document.getElementById('bfsActionLog').innerText = '탐색 시작 전입니다.';
+      document.getElementById('dfsActionLog').innerText = '탐색 시작 전입니다.';
+    }
+
+    function applyStep(stepIdx) {
+      if (!bfsResult || !dfsResult) return;
+
+      const bfsStep = bfsResult.steps[Math.min(stepIdx, bfsResult.steps.length - 1)];
+      renderStepToGrid('gridBfs', bfsStep, 'bg-sky-600/70', 'border-sky-500/50', bfsResult.found);
+      updateDataStructureDOM('bfsQueueContainer', 'bfsQueueLength', bfsStep.queue, 'blue', 'Queue [FIFO]');
+      document.getElementById('bfsStepBadge').innerText = `스텝 ${Math.min(stepIdx + 1, bfsResult.steps.length)} / ${bfsResult.steps.length}`;
+      document.getElementById('bfsActionLog').innerText = bfsStep.action;
+
+      const dfsStep = dfsResult.steps[Math.min(stepIdx, dfsResult.steps.length - 1)];
+      renderStepToGrid('gridDfs', dfsStep, 'bg-purple-600/70', 'border-purple-500/50', dfsResult.found);
+      updateDataStructureDOM('dfsStackContainer', 'dfsStackLength', dfsStep.queue, 'purple', 'Stack [LIFO]');
+      document.getElementById('dfsStepBadge').innerText = `스텝 ${Math.min(stepIdx + 1, dfsResult.steps.length)} / ${dfsResult.steps.length}`;
+      document.getElementById('dfsActionLog').innerText = dfsStep.action;
+
+      if (stepIdx >= maxSteps - 1) {
+        highlightFinalPaths();
+      }
+    }
+
+    function renderStepToGrid(containerId, step, visitedBg, visitedBorder, isFound) {
+      const visitedSet = new Set((step.visited || []).map(p => `${p[0]},${p[1]}`));
+      const queueSet = new Set((step.queue || []).map(p => `${p[0]},${p[1]}`));
+      const [curR, curC] = step.current || [-1, -1];
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if ((r === startPos[0] && c === startPos[1]) || (r === goalPos[0] && c === goalPos[1])) continue;
+          if (gridData[r][c] === 1) continue;
+
+          const cell = document.getElementById(`${containerId}_cell_${r}_${c}`);
+          if (!cell) continue;
+
+          if (r === curR && c === curC) {
+            cell.className = 'w-5 h-5 sm:w-6 sm:h-6 rounded-sm bg-amber-400 text-slate-950 font-black shadow-lg scale-110 flex items-center justify-center';
+            cell.innerText = '●';
+          } else if (visitedSet.has(`${r},${c}`)) {
+            cell.className = `w-5 h-5 sm:w-6 sm:h-6 rounded-sm ${visitedBg} border ${visitedBorder}`;
+            cell.innerText = '';
+          } else if (queueSet.has(`${r},${c}`)) {
+            cell.className = 'w-5 h-5 sm:w-6 sm:h-6 rounded-sm bg-indigo-950/80 border border-indigo-700/60 flex items-center justify-center text-[8px] text-indigo-300';
+            cell.innerText = '·';
           } else {
-            togglePlay();
+            cell.className = 'w-5 h-5 sm:w-6 sm:h-6 rounded-sm bg-slate-900/60 border border-slate-800/40';
+            cell.innerText = '';
           }
-        }, 800);
+        }
       }
     }
 
-    function resetGraph() {
-      if (timer) togglePlay();
-      simulationSteps = [];
-      currentStepIndex = 0;
-      document.getElementById('stepBadge').innerText = '대기 중';
-      document.getElementById('dataStructureBox').innerHTML = '<span class="text-slate-600">(비어 있음)</span>';
-      document.getElementById('visitedBox').innerHTML = '<span class="text-slate-600">(방문 없음)</span>';
-      renderGraph();
-    }
+    function updateDataStructureDOM(containerId, countId, items, color, typeLabel) {
+      const container = document.getElementById(containerId);
+      const countEl = document.getElementById(countId);
+      countEl.innerText = `대기 원소: ${items.length}개`;
 
-    function loadPresetGraph() {
-      resetGraph();
-    }
-
-    function testConnection() {
-      const url = document.getElementById('serverUrl').value.trim();
-      const statusEl = document.getElementById('connectionStatus');
-      if (!url) {
-        statusEl.innerText = '⚠️ Cloud Run 서버 URL을 입력하세요.';
-        statusEl.className = 'text-xs text-amber-400 mt-2';
+      if (!items || items.length === 0) {
+        container.innerHTML = `<span class="text-slate-600 text-[11px]">(${typeLabel} 비어 있음)</span>`;
         return;
       }
-      statusEl.innerText = '서버 헬스체크 연결 중...';
-      statusEl.className = 'text-xs text-blue-400 mt-2';
 
-      fetch(url.replace(/\/+$/, '') + '/health')
-        .then(r => r.json())
-        .then(data => {
-          statusEl.innerText = '✅ 백엔드 정상 연결 확인: ' + JSON.stringify(data);
-          statusEl.className = 'text-xs text-emerald-400 mt-2';
-        })
-        .catch(err => {
-          statusEl.innerText = '⚠️ 연결 확인 중 (CORS 또는 URL 확인 필요): ' + err.message;
-          statusEl.className = 'text-xs text-slate-400 mt-2';
-        });
+      const chips = items.slice(-8).map(coord => 
+        `<span class="px-2 py-0.5 rounded bg-${color}-950 text-${color}-300 border border-${color}-800/80 whitespace-nowrap">(${coord[0]},${coord[1]})</span>`
+      );
+      if (items.length > 8) {
+        chips.unshift(`<span class="text-slate-500 text-[10px]">+${items.length - 8}...</span>`);
+      }
+      container.innerHTML = chips.join('<span class="text-slate-600 text-[10px]">➜</span>');
     }
 
-    // Initial render
+    function highlightFinalPaths() {
+      if (bfsResult && bfsResult.found && bfsResult.path) {
+        bfsResult.path.forEach(([r, c]) => {
+          if ((r === startPos[0] && c === startPos[1]) || (r === goalPos[0] && c === goalPos[1])) return;
+          const cell = document.getElementById(`gridBfs_cell_${r}_${c}`);
+          if (cell) {
+            cell.className = 'w-5 h-5 sm:w-6 sm:h-6 rounded-sm bg-amber-400 text-slate-950 font-black shadow-md path-cell flex items-center justify-center';
+            cell.innerText = '★';
+          }
+        });
+      }
+
+      if (dfsResult && dfsResult.found && dfsResult.path) {
+        dfsResult.path.forEach(([r, c]) => {
+          if ((r === startPos[0] && c === startPos[1]) || (r === goalPos[0] && c === goalPos[1])) return;
+          const cell = document.getElementById(`gridDfs_cell_${r}_${c}`);
+          if (cell) {
+            cell.className = 'w-5 h-5 sm:w-6 sm:h-6 rounded-sm bg-fuchsia-400 text-slate-950 font-black shadow-md path-cell flex items-center justify-center';
+            cell.innerText = '★';
+          }
+        });
+      }
+    }
+
+    function updateKPIsFinal() {
+      if (!bfsResult || !dfsResult) return;
+
+      const bfsP = bfsResult.found ? `${bfsResult.path_length}칸` : '도달 불가';
+      const dfsP = dfsResult.found ? `${dfsResult.path_length}칸` : '도달 불가';
+      document.getElementById('kpiBfsPath').innerText = bfsP;
+      document.getElementById('kpiDfsPath').innerText = dfsP;
+
+      const diff = bfsResult.path_length - dfsResult.path_length;
+      if (diff === 0) {
+        document.getElementById('kpiPathComment').innerText = '두 알고리즘의 탈출 경로 길이가 동일합니다.';
+      } else if (diff < 0) {
+        document.getElementById('kpiPathComment').innerHTML = `<span class="text-blue-400 font-bold">BFS가 ${Math.abs(diff)}칸 더 짧은 최단 경로 달성!</span>`;
+      } else {
+        document.getElementById('kpiPathComment').innerText = `경로 길이 차이: ${Math.abs(diff)}칸`;
+      }
+
+      document.getElementById('kpiBfsVisited').innerText = `${bfsResult.visited_cells_count}칸`;
+      document.getElementById('kpiDfsVisited').innerText = `${dfsResult.visited_cells_count}칸`;
+      const vDiff = bfsResult.visited_cells_count - dfsResult.visited_cells_count;
+      document.getElementById('kpiVisitedComment').innerText = vDiff < 0 
+        ? `BFS가 ${Math.abs(vDiff)}칸 덜 뒤지고 발견` 
+        : `DFS가 운 좋게 ${Math.abs(vDiff)}칸 덜 뒤지고 직진`;
+
+      document.getElementById('kpiBfsMem').innerText = `${bfsResult.peak_memory_size}개`;
+      document.getElementById('kpiDfsMem').innerText = `${dfsResult.peak_memory_size}개`;
+      document.getElementById('kpiMemComment').innerText = `Queue Peak: ${bfsResult.peak_memory_size} vs Stack Peak: ${dfsResult.peak_memory_size}`;
+    }
+
+    function resetKPIs() {
+      document.getElementById('kpiBfsPath').innerText = '-';
+      document.getElementById('kpiDfsPath').innerText = '-';
+      document.getElementById('kpiBfsVisited').innerText = '-';
+      document.getElementById('kpiDfsVisited').innerText = '-';
+      document.getElementById('kpiBfsMem').innerText = '-';
+      document.getElementById('kpiDfsMem').innerText = '-';
+      document.getElementById('kpiPathComment').innerText = '탐색 실행 대기 중';
+      document.getElementById('kpiVisitedComment').innerText = '목적지 도달 전 방문 칸 수';
+      document.getElementById('kpiMemComment').innerText = 'Queue Max vs Stack Max';
+    }
+
+    function setupSpeedSlider() {
+      const slider = document.getElementById('speedSlider');
+      const label = document.getElementById('speedLabel');
+      slider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        stepDelay = 310 - val;
+        if (val < 80) label.innerText = '느림';
+        else if (val < 200) label.innerText = '보통';
+        else label.innerText = '고속 ⚡';
+
+        if (playTimer) {
+          clearInterval(playTimer);
+          playTimer = setInterval(tick, stepDelay);
+        }
+      });
+    }
+
+    function testBackendConnection() {
+      const url = document.getElementById('serverUrl').value.trim();
+      if (!url) {
+        alert('Cloud Run 서버 URL을 입력하세요.');
+        return;
+      }
+      fetch(url.replace(/\/+$/, '') + '/health')
+        .then(r => r.json())
+        .then(d => alert('✅ Cloud Run 백엔드 정상 연결: ' + JSON.stringify(d)))
+        .catch(e => alert('⚠️ 연결 실패: ' + e.message));
+    }
+
     window.onload = function() {
-      renderGraph();
+      initGrid();
     };
   </script>
 </body>
